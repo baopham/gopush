@@ -4,7 +4,8 @@ Prevent pushing to restricted branches
 
 Usage:
 ------
-List restricted branches in `~/.gopush` - one branch per line
+List your restricted branches in `.gopush_restricted` - one branch per line. The file can be in the current project or parent directory. 
+`gopush` will look from the current directory and continue up to `$HOME`.
 
 ```
 gopush origin master

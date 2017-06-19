@@ -5,10 +5,10 @@ import (
 	"github.com/fatih/color"
 	"github.com/urfave/cli"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"os/user"
+	"path"
 	"strings"
 )
 
@@ -36,7 +36,12 @@ func main() {
 			remote = "origin"
 		}
 
-		restrictedBranches := getRestrictedBranches()
+		restrictedBranches, err := getRestrictedBranches()
+
+		if err != nil {
+			color.Red(err.Error())
+			return
+		}
 
 		for _, restrictedBranch := range restrictedBranches {
 			if restrictedBranch == branch {
@@ -54,24 +59,41 @@ func main() {
 	app.Run(os.Args)
 }
 
-func getRestrictedBranches() []string {
+func getRestrictedBranches() ([]string, error) {
+	branches := []string{}
 	user, err := user.Current()
 
 	if err != nil {
-		log.Fatal(err)
+		return branches, nil
 	}
 
-	path := user.HomeDir + "/.gopush"
-
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return []string{}
-	}
-
-	config, err := ioutil.ReadFile(path)
+	dir, err := os.Getwd()
 
 	if err != nil {
-		log.Fatal(err)
+		return branches, nil
 	}
 
-	return strings.Split(string(config), "\n")
+	stop := false
+
+	for !stop {
+		file := dir + "/.gopush_restricted"
+
+		if _, err := os.Stat(file); !os.IsNotExist(err) {
+			config, err := ioutil.ReadFile(file)
+
+			if err != nil {
+				return branches, err
+			}
+
+			return strings.Split(string(config), "\n"), nil
+		}
+
+		if dir == user.HomeDir {
+			stop = true
+		}
+
+		dir = path.Join(dir, "..")
+	}
+
+	return branches, nil
 }
