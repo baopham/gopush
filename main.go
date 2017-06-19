@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"github.com/fatih/color"
 	"github.com/urfave/cli"
 	"io/ioutil"
 	"log"
@@ -39,7 +40,7 @@ func main() {
 
 		for _, restrictedBranch := range restrictedBranches {
 			if restrictedBranch == branch {
-				log.Fatalf("Cannot push directly to: %s", branch)
+				color.Red("Cannot push directly to: %s", branch)
 				return
 			}
 		}
