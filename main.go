@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/fatih/color"
 	"github.com/urfave/cli"
 	"io/ioutil"
@@ -19,6 +20,7 @@ func main() {
 	app.UsageText = "gopush <branch>"
 	app.Author = "Bao Pham"
 	app.Email = "gbaopham@gmail.com"
+	app.EnableBashCompletion = true
 
 	app.Before = func(c *cli.Context) error {
 		if len(c.Args()) < 1 {
@@ -26,6 +28,26 @@ func main() {
 		}
 
 		return nil
+	}
+
+	app.BashComplete = func(c *cli.Context) {
+		if c.NArg() > 0 {
+			return
+		}
+
+		out, err := exec.Command("git", "branch").Output()
+		sout := string(out)
+
+		if err != nil || strings.Contains(sout, "Not a git repository") {
+			return
+		}
+
+		branches := strings.Split(sout, "\n")
+
+		for _, branch := range branches {
+			branch = strings.TrimLeft(branch, "*")
+			fmt.Println(strings.TrimSpace(branch))
+		}
 	}
 
 	app.Action = func(c *cli.Context) {
