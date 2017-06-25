@@ -1,6 +1,6 @@
 gopush
 ======
-Prevent pushing to restricted branches
+Prevent (force) pushing to restricted branches
 
 Table of Content
 ----------------
@@ -11,7 +11,7 @@ Table of Content
 * [License](#license)
 * [Author](#author)
 
-Usage:
+Usage
 ------
 List your restricted branches in [.gopush.json](gopush.json.example). The file can be in the current project or parent directory. 
 `gopush` will look from the current directory and continue up to `$HOME`.
@@ -23,11 +23,11 @@ gopush master
 ```
 
 
-Requirements:
+Requirements
 -------------
 * Go
 
-Install:
+Install
 --------
 ```
 go get github.com/baopham/gopush
@@ -45,10 +45,10 @@ source /local/path/gopush_bash_autocomplete
 source /local/path/gopush_zsh_autocomplete
 ```
 
-License:
+License
 --------
 MIT
 
-Author:
+Author
 -------
 Bao Pham
