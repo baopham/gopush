@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/fatih/color"
@@ -12,6 +13,15 @@ import (
 	"path"
 	"strings"
 )
+
+type BranchConfig struct {
+	NoForcePush        bool `json:"noForcePush"`
+	NoPush             bool `json:"noPush"`
+	AskBeforeForcePush bool `json:"askBeforeForcePush"`
+	AskBeforePush      bool `json:"askBeforePush"`
+}
+
+type Config map[string]BranchConfig
 
 func main() {
 	app := cli.NewApp()
@@ -30,84 +40,119 @@ func main() {
 		return nil
 	}
 
-	app.BashComplete = func(c *cli.Context) {
-		if c.NArg() > 0 {
-			return
-		}
+	app.BashComplete = bashComplete
 
-		out, err := exec.Command("git", "branch").Output()
-		sout := string(out)
-
-		if err != nil || strings.Contains(sout, "Not a git repository") {
-			return
-		}
-
-		branches := strings.Split(sout, "\n")
-
-		for _, branch := range branches {
-			branch = strings.TrimLeft(branch, "*")
-			fmt.Println(strings.TrimSpace(branch))
-		}
+	app.Flags = []cli.Flag{
+		cli.BoolTFlag{
+			Name:  "force, f",
+			Usage: "Force push",
+		},
 	}
 
-	app.Action = func(c *cli.Context) {
-		remote, branch := c.Args().Get(0), c.Args().Get(1)
-
-		if branch == "" {
-			branch = remote
-			remote = "origin"
-		}
-
-		restrictedBranches, err := getRestrictedBranches()
-
-		if err != nil {
-			color.Red(err.Error())
-			return
-		}
-
-		for _, restrictedBranch := range restrictedBranches {
-			if restrictedBranch == branch {
-				color.Red("Cannot push directly to: %s", branch)
-				return
-			}
-		}
-
-		cmd := exec.Command("git", "push", remote, branch)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Run()
-	}
+	app.Action = push
 
 	app.Run(os.Args)
 }
 
-func getRestrictedBranches() ([]string, error) {
-	branches := []string{}
+func push(c *cli.Context) {
+	remote, branch := c.Args().Get(0), c.Args().Get(1)
+
+	if branch == "" {
+		branch = remote
+		remote = "origin"
+	}
+
+	config, err := getConfig()
+
+	if err != nil {
+		color.Red(err.Error())
+		return
+	}
+
+	branchConfig, ok := config[branch]
+
+	if !ok {
+		execCommand(remote, branch)
+		return
+	}
+
+	if c.Bool("force") && branchConfig.AskBeforeForcePush {
+		proceed, err := prompt("Are you sure you want to force push to: %s?", branch)
+		if !proceed || err != nil {
+			return
+		}
+
+		if !proceed {
+			color.Red("Cannot force push to: %s", branch)
+			return
+		}
+	}
+
+	if !c.Bool("force") && branchConfig.NoPush {
+		proceed := false
+		if branchConfig.AskBeforePush {
+			proceed, err := prompt("Are you sure you want to push to: %s?", branch)
+			if !proceed || err != nil {
+				return
+			}
+		}
+
+		if !proceed {
+			color.Red("Cannot push directly to: %s", branch)
+			return
+		}
+	}
+
+	execCommand(remote, branch)
+}
+
+func bashComplete(c *cli.Context) {
+	if c.NArg() > 0 {
+		return
+	}
+
+	out, err := exec.Command("git", "branch").Output()
+	sout := string(out)
+
+	if err != nil || strings.Contains(sout, "Not a git repository") {
+		return
+	}
+
+	branches := strings.Split(sout, "\n")
+
+	for _, branch := range branches {
+		branch = strings.TrimLeft(branch, "*")
+		fmt.Println(strings.TrimSpace(branch))
+	}
+}
+
+func execCommand(remote, branch string) {
+	color.Green("Pushing to %s:%s...", remote, branch)
+	cmd := exec.Command("git", "push", remote, branch)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Run()
+}
+
+func getConfig() (Config, error) {
 	user, err := user.Current()
 
 	if err != nil {
-		return branches, nil
+		return Config{}, err
 	}
 
 	dir, err := os.Getwd()
-
-	if err != nil {
-		return branches, nil
-	}
-
 	stop := false
 
 	for !stop {
-		file := dir + "/.gopush_restricted"
+		file := path.Join(dir, ".gopush.json")
 
 		if _, err := os.Stat(file); !os.IsNotExist(err) {
-			config, err := ioutil.ReadFile(file)
+			out, err := ioutil.ReadFile(file)
 
-			if err != nil {
-				return branches, err
-			}
-
-			return strings.Split(string(config), "\n"), nil
+			var config Config
+			err = json.Unmarshal(out, &config)
+			return config, err
 		}
 
 		if dir == user.HomeDir {
@@ -117,5 +162,34 @@ func getRestrictedBranches() ([]string, error) {
 		dir = path.Join(dir, "..")
 	}
 
-	return branches, nil
+	return Config{}, nil
+}
+
+func prompt(format string, a ...interface{}) (bool, error) {
+	if !strings.Contains(format, "[y/n]") {
+		format += " [y/n] "
+	}
+	if len(a) == 0 {
+		fmt.Print(format)
+	} else {
+		fmt.Printf(format, a...)
+	}
+	return handlePromptResponse()
+}
+
+func handlePromptResponse() (bool, error) {
+	var response string
+	_, err := fmt.Scanln(&response)
+
+	if err != nil {
+		return false, err
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+
+	if response == "y" || response == "yes" {
+		return true, nil
+	}
+
+	return false, nil
 }

@@ -1,0 +1,10 @@
+{
+    "master": {
+        "noPush": true,
+        "askBeforePush": true
+    },
+    "develop": {
+        "noForcePush": true,
+        "askBeforeForcePush": true
+    }
+}
