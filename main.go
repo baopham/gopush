@@ -42,24 +42,27 @@ func main() {
 
 	app.BashComplete = bashComplete
 
-	app.Flags = []cli.Flag{
-		cli.BoolTFlag{
-			Name:  "force, f",
-			Usage: "Force push",
-		},
-	}
-
 	app.Action = push
 
 	app.Run(os.Args)
 }
 
 func push(c *cli.Context) {
-	remote, branch := c.Args().Get(0), c.Args().Get(1)
+	var force bool
+	var remote, branch string
+
+	for _, arg := range c.Args() {
+		if strings.HasPrefix(arg, "-") {
+			force = arg == "-f" || arg == "--force"
+		} else if remote == "" {
+			remote = arg
+		} else if branch == "" {
+			branch = arg
+		}
+	}
 
 	if branch == "" {
-		branch = remote
-		remote = "origin"
+		branch, remote = remote, "origin"
 	}
 
 	config, err := getConfig()
@@ -72,14 +75,17 @@ func push(c *cli.Context) {
 	branchConfig, ok := config[branch]
 
 	if !ok {
-		execCommand(remote, branch)
+		execCommand(remote, branch, force)
 		return
 	}
 
-	if c.Bool("force") && branchConfig.AskBeforeForcePush {
-		proceed, err := prompt("Are you sure you want to force push to: %s?", branch)
-		if !proceed || err != nil {
-			return
+	if force && branchConfig.NoForcePush {
+		proceed := false
+		if branchConfig.AskBeforeForcePush {
+			proceed = prompt("Are you sure you want to force push to: %s?", branch)
+			if !proceed || err != nil {
+				return
+			}
 		}
 
 		if !proceed {
@@ -88,10 +94,10 @@ func push(c *cli.Context) {
 		}
 	}
 
-	if !c.Bool("force") && branchConfig.NoPush {
+	if !force && branchConfig.NoPush {
 		proceed := false
 		if branchConfig.AskBeforePush {
-			proceed, err := prompt("Are you sure you want to push to: %s?", branch)
+			proceed = prompt("Are you sure you want to push to: %s?", branch)
 			if !proceed || err != nil {
 				return
 			}
@@ -103,7 +109,7 @@ func push(c *cli.Context) {
 		}
 	}
 
-	execCommand(remote, branch)
+	execCommand(remote, branch, force)
 }
 
 func bashComplete(c *cli.Context) {
@@ -126,9 +132,17 @@ func bashComplete(c *cli.Context) {
 	}
 }
 
-func execCommand(remote, branch string) {
-	color.Green("Pushing to %s:%s...", remote, branch)
-	cmd := exec.Command("git", "push", remote, branch)
+func execCommand(remote, branch string, force bool) {
+	var cmd *exec.Cmd
+
+	if force {
+		color.Green("Force pushing to %s:%s %s...", remote, branch, "-f")
+		cmd = exec.Command("git", "push", remote, branch, "-f")
+	} else {
+		color.Green("Pushing to %s:%s...", remote, branch)
+		cmd = exec.Command("git", "push", remote, branch)
+	}
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Run()
@@ -165,7 +179,7 @@ func getConfig() (Config, error) {
 	return Config{}, nil
 }
 
-func prompt(format string, a ...interface{}) (bool, error) {
+func prompt(format string, a ...interface{}) bool {
 	if !strings.Contains(format, "[y/n]") {
 		format += " [y/n] "
 	}
@@ -177,19 +191,19 @@ func prompt(format string, a ...interface{}) (bool, error) {
 	return handlePromptResponse()
 }
 
-func handlePromptResponse() (bool, error) {
+func handlePromptResponse() bool {
 	var response string
 	_, err := fmt.Scanln(&response)
 
 	if err != nil {
-		return false, err
+		return false
 	}
 
 	response = strings.TrimSpace(strings.ToLower(response))
 
 	if response == "y" || response == "yes" {
-		return true, nil
+		return true
 	}
 
-	return false, nil
+	return false
 }
