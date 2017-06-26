@@ -136,7 +136,7 @@ func execCommand(remote, branch string, force bool) {
 	var cmd *exec.Cmd
 
 	if force {
-		color.Green("Force pushing to %s:%s %s...", remote, branch, "-f")
+		color.Green("Force pushing to %s:%s...", remote, branch)
 		cmd = exec.Command("git", "push", remote, branch, "-f")
 	} else {
 		color.Green("Pushing to %s:%s...", remote, branch)
