@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/baopham/go-cliutil/cliutil"
 	"github.com/fatih/color"
 	"github.com/urfave/cli"
 	"io/ioutil"
@@ -82,7 +83,7 @@ func push(c *cli.Context) {
 	if force && branchConfig.NoForcePush {
 		proceed := false
 		if branchConfig.AskBeforeForcePush {
-			proceed = prompt("Are you sure you want to force push to: %s?", branch)
+			proceed = cliutil.Prompt("Are you sure you want to force push to: %s?", branch)
 			if !proceed || err != nil {
 				return
 			}
@@ -97,7 +98,7 @@ func push(c *cli.Context) {
 	if !force && branchConfig.NoPush {
 		proceed := false
 		if branchConfig.AskBeforePush {
-			proceed = prompt("Are you sure you want to push to: %s?", branch)
+			proceed = cliutil.Prompt("Are you sure you want to push to: %s?", branch)
 			if !proceed || err != nil {
 				return
 			}
@@ -177,33 +178,4 @@ func getConfig() (Config, error) {
 	}
 
 	return Config{}, nil
-}
-
-func prompt(format string, a ...interface{}) bool {
-	if !strings.Contains(format, "[y/n]") {
-		format += " [y/n] "
-	}
-	if len(a) == 0 {
-		fmt.Print(format)
-	} else {
-		fmt.Printf(format, a...)
-	}
-	return handlePromptResponse()
-}
-
-func handlePromptResponse() bool {
-	var response string
-	_, err := fmt.Scanln(&response)
-
-	if err != nil {
-		return false
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-
-	if response == "y" || response == "yes" {
-		return true
-	}
-
-	return false
 }
