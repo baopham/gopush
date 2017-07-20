@@ -1,5 +1,2 @@
-autoload -U compinit && compinit
-autoload -U bashcompinit && bashcompinit
-
 script_dir=$GOPATH/src/github.com/baopham/gopush/autocomplete
 source ${script_dir}/gopush_bash_autocomplete
